@@ -50,15 +50,23 @@ Static frontends need no port or process — build artifacts go to
 
 ### Deployment
 
-Standard deploy for any Node service:
+**Every push to `main` deploys automatically** via GitHub Actions
+(`.github/workflows/deploy.yml` in each repo). Tests gate the deploy; a
+liveness check closes it. `workflow_dispatch` allows manual re-runs from
+the Actions tab.
 
-    ssh vps 'cd ~/apps/<repo> && git pull && npm ci --omit=dev && pm2 restart <name>'
-
-- Verify after deploy: `ssh vps 'pm2 list'` and
+- Node services: CI sshes to the VPS and runs
+  `git pull --ff-only && npm ci --omit=dev && pm2 restart <name>`, then curls the health route
+- Static frontends: CI builds and rsyncs the output to `/var/www/<name>/`, then curls the site
+- CI reaches the VPS as `maddox` using the `VPS_SSH_KEY` repo secret — a
+  dedicated ed25519 key restricted with `no-agent-forwarding,no-port-forwarding,no-X11-forwarding`
+  in `~/.ssh/authorized_keys`; the VPS host key is pinned in the workflow
+- Manual fallback (same actions, run from the Mac): `npm run deploy` in each repo
+- Verify after deploy: the Actions run log, `ssh vps 'pm2 list'`, or
   `ssh vps 'pm2 logs <name> --lines 20 --nostream'`
-- First-ever start of a new service is manual on the server:
-  create `.env`, `pm2 start app.js --name <name>`, `pm2 save`.
-- Static frontends: build locally, `rsync` the build output to `/var/www/<name>/`.
+- First-ever start of a new service is still manual on the server:
+  create `.env`, `pm2 start app.js --name <name>`, `pm2 save`. New static
+  sites need `/var/www/<name>` created and owned by `maddox` once.
 
 ### Hard rules for agents
 

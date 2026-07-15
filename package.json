@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "dev": "node --watch app.js",
+    "test": "node test/harness.js",
     "deploy": "ssh vps 'cd ~/apps/activity-api && git pull && npm ci --omit=dev && pm2 restart activity-api'"
   },
   "keywords": [],
