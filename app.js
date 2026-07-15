@@ -20,7 +20,19 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 
 const fastify = Fastify({ logger: true });
 
+fastify.register(require('@fastify/cors'), {
+  origin: [
+    'https://dash.maddox-duke.com',
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+  ],
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['content-type', 'x-api-key'],
+});
+
 fastify.addHook('onRequest', async (req, reply) => {
+  // OPTIONS must reach @fastify/cors so browser preflights succeed;
+  // preflights carry no credentials and touch no data.
+  if (req.method === 'OPTIONS') return;
   if (req.routeOptions.url === '/health') return;
   if (req.headers['x-api-key'] !== API_KEY) {
     return reply.code(401).send({ error: 'unauthorized' });
