@@ -1,10 +1,11 @@
 {
   "name": "activity-api",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Small Fastify service for recording activity events",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch app.js",
+    "deploy": "ssh vps 'cd ~/apps/activity-api && git pull && npm ci --omit=dev && pm2 restart activity-api'"
   },
   "keywords": [],
   "author": "",
