@@ -115,6 +115,9 @@ other producers (editing PC, car projects, manual entries) also feed.
 
 3. **Dashboard — "Whereabouts"** (built — repo `activity-dash`, static Angular 22
    app at `dash.maddox-duke.com`, deployed by rsync to `/var/www/dash`)
+   Two routed pages sharing the key-gate and store: `/` (the almanac) and
+   `/cutting-room` (editing sessions — see component 4). Caddy's
+   `try_files {path} /index.html` covers deep links.
    - Key-gated in the client: the operator key is entered once, verified
      against the API, and kept in localStorage. `?demo=1` renders seeded
      specimen data with no key. The site itself carries no secrets.
@@ -125,9 +128,23 @@ other producers (editing PC, car projects, manual entries) also feed.
    - Views: scrubbable 24 h day band with live needle and hour probe, week
      rhythm, gym session pins, weekly hours balance, journey passages
      (median per weekday), raw ledger tail.
+   - Activity sessions: `<name>_start`/`<name>_stop` events pair on a track
+     independent of place stays (activities overlap places). A repeated start
+     closes the open session as a tightly-bounded *unknown* (crash = gap).
+     Powers `/cutting-room`: live deck-counter timecode, film-reel session
+     shelf, shop-vs-bench weekly trade, hour-of-day frames, bench ledger.
    - Design language: nocturnal field-almanac — warm near-black paper, bone
      ink, brass fittings, Fraunces + IBM Plex Mono, engraved rules. No UI
-     or chart libraries; keep it that way.
+     or chart libraries; keep it that way. Editing ink is muted viridian.
+
+4. **RoughCut beacon** (producer — in the RoughCut repo, `src/roughcut/activity.py`)
+   - The video editor posts `editing_start` when its app/review server binds
+     and `editing_stop` on graceful shutdown, `source: roughcut`
+   - Opt-in only: requires an `[activity]` block (url + api_key) in
+     `~/.roughcut/credentials.toml`; absent block = no network calls ever
+     (RoughCut is a commercial product — see its PRIVACY.md)
+   - Fire-and-forget daemon thread, 3 s timeout, never breaks editing; a
+     crash simply misses the stop and the dashboard shows a gap
 
 ### Design principles
 
@@ -146,7 +163,8 @@ other producers (editing PC, car projects, manual entries) also feed.
 2. Duration-pairing endpoint(s): `GET /sessions?event_pair=arrived_gym,left_gym`
 3. ~~Dashboard v1 at dash.maddox-duke.com~~ — shipped July 2026 ("Whereabouts")
 4. Weekly automated summary (scheduled analysis producing a narrative digest)
-5. Additional producers: editing-time events from desktop, drive-session events
+5. Additional producers: ~~editing-time events from desktop~~ — shipped July
+   2026 (RoughCut beacon + "The Cutting Room" page); drive-session events next
 6. Longer-term integrations with other personal projects (e.g., car telemetry
    summaries from RetroDash's Pi posting as `source: retrodash`)
 
