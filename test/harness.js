@@ -225,16 +225,37 @@ async function main() {
   r = await fetch(BASE + `/digest?date=${yesterday}`);
   check('GET /digest no key -> 401', r.status === 401, r.status);
 
-  // 21. digest for yesterday: paired buckets with spans
+  // 21. digest for yesterday: chronological 12-hour entries
   r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}`, { headers: KEY });
   body = await r.json();
   check('GET /digest -> 200 with day lines',
     r.status === 200 && Array.isArray(body.day) && body.date === yesterday, r.status + ' ' + JSON.stringify(body.day));
   const dayStr = (body.day || []).join(' | ');
-  check('digest pairs work 8h00 (9:00–17:00)', dayStr.includes('work 8h00 (9:00–17:00)'), dayStr);
-  check('digest pairs gym 1h05', dayStr.includes('gym 1h05'), dayStr);
-  check('digest pairs bench 1h30 (20:30–22:00)', dayStr.includes('bench 1h30 (20:30–22:00)'), dayStr);
-  check('digest counts transit', dayStr.includes('in transit'), dayStr);
+  check('digest tells work chronologically in 12h time', dayStr.includes('9:00am work — 8h00'), dayStr);
+  check('digest tells gym after work', dayStr.includes('5:25pm gym — 1h05'), dayStr);
+  check('digest tells the evening reel', dayStr.includes('8:30pm bench — 1h30'), dayStr);
+  check('digest keeps chronological order',
+    dayStr.indexOf('work') < dayStr.indexOf('gym') && dayStr.indexOf('gym') < dayStr.indexOf('bench'), dayStr);
+  check('digest has no aggregation counters', !dayStr.includes('×'), dayStr);
+  check('digest totals line covers buckets and transit',
+    typeof body.totals === 'string' && body.totals.includes('work 8h00')
+      && body.totals.includes('gym 1h05') && body.totals.includes('bench 1h30')
+      && body.totals.includes('transit'), body.totals);
+  check('digest reports gym streak', body.streak >= 1, String(body.streak));
+  check('an honest day earns no note', body.note === null, String(body.note));
+  check('digest body is multi-line with title first',
+    body.body.startsWith(body.title + '\n') && body.body.split('\n').length >= 4, body.body);
+
+  // 21c. a lazy day earns the requested verdict
+  const lazyDay = addDays(yesterday, -3);
+  const [lz, lm, ld] = lazyDay.split('-').map(Number);
+  const lazyAt = (h, mi) => new Date(zonedTimeToUtc(lz, lm, ld, h, mi, TZ)).toISOString();
+  await post(lazyAt(10, 0), 'left_home');
+  await post(lazyAt(10, 30), 'arrived_home');
+  r = await fetch(BASE + `/digest?date=${lazyDay}&tz=${TZ}`, { headers: KEY });
+  body = await r.json();
+  check('a lazy day earns a verdict note',
+    typeof body.note === 'string' && body.note.length > 20, String(body.note));
   // Weekly rides along exactly when the reported day is a Sunday.
   const yesterdayIsSunday = new Intl.DateTimeFormat('en', {
     timeZone: TZ, weekday: 'short',
