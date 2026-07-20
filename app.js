@@ -97,7 +97,9 @@ fastify.get('/digest', async (req, reply) => {
   }
 
   const nowMs = Date.now();
-  const date = req.query.date ?? dayKeyInTz(nowMs, tz);
+  // Default to the completed prior day: an evening report on "today" would
+  // always miss the late hours. Calendar arithmetic, so DST can't skip a day.
+  const date = req.query.date ?? addDays(dayKeyInTz(nowMs, tz), -1);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(dayWindow(date, tz).start)) {
     return reply.code(400).send({ error: 'date must be YYYY-MM-DD' });
   }

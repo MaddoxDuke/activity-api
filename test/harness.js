@@ -235,8 +235,19 @@ async function main() {
   check('digest pairs gym 1h05', dayStr.includes('gym 1h05'), dayStr);
   check('digest pairs bench 1h30 (20:30–22:00)', dayStr.includes('bench 1h30 (20:30–22:00)'), dayStr);
   check('digest counts transit', dayStr.includes('in transit'), dayStr);
+  // Weekly rides along exactly when the reported day is a Sunday.
+  const yesterdayIsSunday = new Intl.DateTimeFormat('en', {
+    timeZone: TZ, weekday: 'short',
+  }).format(new Date(zonedTimeToUtc(yy, ym, yd, 12, 0, TZ))) === 'Sun';
   check('digest body is notification-ready text',
-    typeof body.body === 'string' && body.body.length > 20 && !body.week, body.body);
+    typeof body.body === 'string' && body.body.length > 20 && !!body.week === yesterdayIsSunday,
+    body.body);
+
+  // 21b. no date param -> reports the completed prior day
+  r = await fetch(BASE + `/digest?tz=${TZ}`, { headers: KEY });
+  body = await r.json();
+  check('GET /digest default date -> yesterday', body.date === yesterday,
+    body.date + ' vs ' + yesterday);
 
   // 22. weekly reading on demand
   r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}&week=1`, { headers: KEY });

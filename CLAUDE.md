@@ -99,11 +99,13 @@ other producers (editing PC, car projects, manual entries) also feed.
    - Node 22 / Fastify / pg
    - `POST /events` — accepts `{ts, event, source}`, requires `x-api-key` header
    - `GET /events?from=<iso date>` — returns rows ordered by ts, requires key
-   - `GET /digest?date=&tz=&week=1` — the evening dispatch: server-side
+   - `GET /digest?date=&tz=&week=1` — the daily dispatch: server-side
      session pairing (lib/derive.js mirrors the dash rules) rendered as a
-     phone-notification-ready day summary; Sundays (or `week=1`) add a
-     week-over-week reading plus ≤2 deterministic advice lines. Consumed by
-     an iOS Shortcuts personal automation each evening. Requires key.
+     phone-notification-ready summary of the completed prior day (default;
+     `date=` overrides). When the reported day is a Sunday (or `week=1`),
+     adds a full-week reading plus ≤2 deterministic advice lines — so the
+     Monday report reviews the finished week. Consumed by an iOS Shortcuts
+     personal automation. Requires key.
    - `GET /health` — unauthenticated, for monitoring
    - Validation: `ts` must parse as a date; `event` must be snake_case text
    - CORS: allows `https://dash.maddox-duke.com` and localhost dev origins
