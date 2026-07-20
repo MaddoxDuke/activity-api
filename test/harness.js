@@ -231,9 +231,9 @@ async function main() {
   check('GET /digest -> 200 with day lines',
     r.status === 200 && Array.isArray(body.day) && body.date === yesterday, r.status + ' ' + JSON.stringify(body.day));
   const dayStr = (body.day || []).join(' | ');
-  check('digest tells work chronologically in 12h time', dayStr.includes('9:00am work — 8h00'), dayStr);
-  check('digest tells gym after work', dayStr.includes('5:25pm gym — 1h05'), dayStr);
-  check('digest tells the evening reel', dayStr.includes('8:30pm bench — 1h30'), dayStr);
+  check('digest tells work with start and end', dayStr.includes('work — 8h00 (9:00am–5:00pm)'), dayStr);
+  check('digest tells gym with start and end', dayStr.includes('gym — 1h05 (5:25pm–6:30pm)'), dayStr);
+  check('digest tells the reel with start and end', dayStr.includes('bench — 1h30 (8:30pm–10:00pm)'), dayStr);
   check('digest keeps chronological order',
     dayStr.indexOf('work') < dayStr.indexOf('gym') && dayStr.indexOf('gym') < dayStr.indexOf('bench'), dayStr);
   check('digest has no aggregation counters', !dayStr.includes('×'), dayStr);
