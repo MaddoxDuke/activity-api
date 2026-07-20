@@ -155,6 +155,13 @@ other producers (editing PC, car projects, manual entries) also feed.
      closes the open session as a tightly-bounded *unknown* (crash = gap).
      Powers `/cutting-room`: live deck-counter timecode, film-reel session
      shelf, shop-vs-bench weekly trade, hour-of-day frames, bench ledger.
+   - Almanac back-matter (folios VII–IX): **The Analyst** (nightly counsel
+     filed by the `almanac-analyst` scheduled Claude Code routine on the
+     operator's Max subscription — local scheduled task, runs while the
+     desktop app is open), **Vitals** (weight/kcal/protein via the Apple
+     Health shortcut → `/metrics`), and **The Field Pen** (write events from
+     the page: focus_start/focus_stop toggle + any snake_case event, source
+     `field_pen`).
    - Design language: nocturnal field-almanac — warm near-black paper, bone
      ink, brass fittings, Fraunces + IBM Plex Mono, engraved rules. No UI
      or chart libraries; keep it that way. Editing ink is muted viridian.
