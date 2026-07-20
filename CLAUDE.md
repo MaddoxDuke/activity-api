@@ -28,7 +28,8 @@ Caddy block + one dedicated Postgres user/database.
 |------|---------|-----------|
 | 3000 | activity-api | api.maddox-duke.com |
 | —    | activity dashboard (static) | dash.maddox-duke.com |
-| 3001 | (next project) | |
+| 3001 | channel-api | tube.maddox-duke.com |
+| 3002 | (next project) | |
 
 **When adding a new service:** claim the next port here, create a dedicated DB
 user + database (`sudo -u postgres createuser --pwprompt <proj>_user && sudo -u postgres createdb -O <proj>_user <proj>`),
