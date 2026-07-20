@@ -8,10 +8,13 @@ const APP_DIR = path.join(__dirname, '..');
 
 process.env.DATABASE_URL = 'postgres://stub:stub@localhost:5432/stub';
 process.env.API_KEY = 'test-key-123';
+process.env.ANALYST_KEY = 'analyst-key-456';
 process.env.PORT = '3199';
 
-// In-memory fake table
+// In-memory fake tables
 const inserted = [];
+const metrics = [];
+const analystNotes = [];
 
 const pgPath = require.resolve('pg', { paths: [APP_DIR] });
 require.cache[pgPath] = {
@@ -23,9 +26,38 @@ require.cache[pgPath] = {
       async query(text, params) {
         const sql = text.trim();
         if (sql.startsWith('CREATE TABLE')) return { rows: [] };
-        if (sql.startsWith('INSERT')) {
+        if (sql.startsWith('INSERT INTO events')) {
           inserted.push({ ts: params[0], event: params[1], source: params[2] ?? 'unknown' });
           return { rows: [] };
+        }
+        if (sql.startsWith('INSERT INTO metrics')) {
+          const [day, name, value, unit, source] = params;
+          const row = { day, name, value, unit, source: source ?? 'unknown' };
+          const i = metrics.findIndex((m) => m.day === day && m.name === name);
+          if (i >= 0) metrics[i] = row; else metrics.push(row);
+          return { rows: [] };
+        }
+        if (sql.includes('FROM metrics WHERE day = ')) {
+          return { rows: metrics.filter((m) => m.day === params[0]) };
+        }
+        if (sql.includes('FROM metrics WHERE day >=')) {
+          return { rows: metrics.filter((m) => m.day >= params[0]) };
+        }
+        if (sql.includes('FROM metrics ORDER BY')) {
+          return { rows: [...metrics] };
+        }
+        if (sql.startsWith('INSERT INTO analyst_notes')) {
+          const [day, briefing, observations, suggestions] = params;
+          const row = { day, briefing, observations: JSON.parse(observations), suggestions: JSON.parse(suggestions), received_at: new Date().toISOString() };
+          const i = analystNotes.findIndex((n) => n.day === day);
+          if (i >= 0) analystNotes[i] = row; else analystNotes.push(row);
+          return { rows: [] };
+        }
+        if (sql.includes('FROM analyst_notes WHERE day = ')) {
+          return { rows: analystNotes.filter((n) => n.day === params[0]).map((n) => ({ briefing: n.briefing })) };
+        }
+        if (sql.includes('FROM analyst_notes ORDER BY')) {
+          return { rows: [...analystNotes].sort((x, y) => (x.day < y.day ? 1 : -1)).slice(0, params[0]) };
         }
         if (sql.startsWith('SELECT')) {
           let rows = inserted.slice();
@@ -284,6 +316,87 @@ async function main() {
   check('digest bad tz -> 400', r.status === 400, r.status);
   r = await fetch(BASE + '/digest?date=16-07-2026', { headers: KEY });
   check('digest bad date -> 400', r.status === 400, r.status);
+
+  // ——— vitals + the analyst ————————————————————————————————————
+  const ANALYST = { 'x-api-key': 'analyst-key-456' };
+
+  // metric ingest + upsert + validation (operator key)
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...KEY, ...JSON_CT },
+    body: JSON.stringify({ day: yesterday, name: 'calories', value: 2140, unit: 'kcal', source: 'health' }),
+  });
+  check('POST /metrics -> ok', r.status === 200, r.status);
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...KEY, ...JSON_CT },
+    body: JSON.stringify({ day: yesterday, name: 'weight', value: 182.6, unit: 'lb', source: 'health' }),
+  });
+  check('POST /metrics second metric -> ok', r.status === 200, r.status);
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...KEY, ...JSON_CT },
+    body: JSON.stringify({ day: yesterday, name: 'calories', value: 2200, unit: 'kcal' }),
+  });
+  check('POST /metrics same day+name upserts', r.status === 200, r.status);
+  r = await fetch(BASE + `/metrics?from=${yesterday}`, { headers: KEY });
+  body = await r.json();
+  check('GET /metrics -> 2 rows after upsert',
+    body.length === 2 && Number(body.find((m) => m.name === 'calories').value) === 2200,
+    JSON.stringify(body));
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...KEY, ...JSON_CT },
+    body: JSON.stringify({ name: 'Bad Name', value: 1 }),
+  });
+  check('POST /metrics bad name -> 400', r.status === 400, r.status);
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...KEY, ...JSON_CT },
+    body: JSON.stringify({ name: 'weight', value: 'heavy' }),
+  });
+  check('POST /metrics non-numeric value -> 400', r.status === 400, r.status);
+
+  // analyst key: may read the record and file notes, nothing else
+  r = await fetch(BASE + '/events', { headers: ANALYST });
+  check('analyst key may read /events', r.status === 200, r.status);
+  r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}`, { headers: ANALYST });
+  check('analyst key may read /digest', r.status === 200, r.status);
+  r = await fetch(BASE + '/events', {
+    method: 'POST', headers: { ...ANALYST, ...JSON_CT },
+    body: JSON.stringify({ ts: new Date().toISOString(), event: 'forged_event' }),
+  });
+  check('analyst key cannot write events -> 401', r.status === 401, r.status);
+  r = await fetch(BASE + '/metrics', {
+    method: 'POST', headers: { ...ANALYST, ...JSON_CT },
+    body: JSON.stringify({ name: 'weight', value: 1 }),
+  });
+  check('analyst key cannot write metrics -> 401', r.status === 401, r.status);
+
+  r = await fetch(BASE + '/analyst', {
+    method: 'POST', headers: { ...ANALYST, ...JSON_CT },
+    body: JSON.stringify({
+      day: yesterday,
+      briefing: 'A strong bench night followed the gym; guard the pre-9pm start.',
+      observations: ['gym at 17:25 for 1h05', 'bench lit at 20:30 for 1h30'],
+      suggestions: ['repeat the gym-then-bench pairing on Wednesday'],
+    }),
+  });
+  body = await r.json();
+  check('analyst key files a note -> ok', r.status === 200 && body.ok === true, JSON.stringify(body));
+  r = await fetch(BASE + '/analyst?limit=5', { headers: ANALYST });
+  body = await r.json();
+  check('GET /analyst -> note with parsed arrays',
+    body.length === 1 && body[0].observations.length === 2 && body[0].suggestions.length === 1,
+    JSON.stringify(body));
+  r = await fetch(BASE + '/analyst', {
+    method: 'POST', headers: { ...ANALYST, ...JSON_CT },
+    body: JSON.stringify({ day: yesterday, briefing: '', observations: [], suggestions: [] }),
+  });
+  check('POST /analyst empty briefing -> 400', r.status === 400, r.status);
+
+  // digest carries vitals + the analyst's line
+  r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}`, { headers: KEY });
+  body = await r.json();
+  check('digest vitals line orders weight before calories',
+    body.vitals === 'vitals: weight 182.6 lb · 2,200 kcal', body.vitals);
+  check('digest body carries the analyst briefing',
+    body.body.includes('the analyst: A strong bench night'), body.body);
 
   console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
   process.exit(failures === 0 ? 0 : 1);

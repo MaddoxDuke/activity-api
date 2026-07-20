@@ -107,6 +107,17 @@ other producers (editing PC, car projects, manual entries) also feed.
      adds a full-week reading plus ≤2 deterministic advice lines — so the
      Monday report reviews the finished week. Consumed by an iOS Shortcuts
      personal automation. Requires key.
+   - `POST /metrics` / `GET /metrics?from=` — daily-grain vitals `{day?,
+     name, value, unit?, source?}`, UNIQUE(day,name) upsert. Fed by an iOS
+     Shortcut reading Apple Health (MyFitnessPal's own API is partner-only;
+     MFP syncs to Health, Health reaches us)
+   - `POST /analyst` / `GET /analyst?limit=` — the analyst's nightly note
+     `{day?, briefing, observations[], suggestions[]}`, filed by a scheduled
+     Claude Code routine on the operator's Max subscription (no API key).
+     `ANALYST_KEY` env: least-privilege key for that routine (may GET
+     events/digest/metrics/analyst and POST /analyst, nothing else)
+   - `/digest` footer also carries the day's vitals line and the analyst's
+     briefing when they exist
    - `GET /health` — unauthenticated, for monitoring
    - Validation: `ts` must parse as a date; `event` must be snake_case text
    - CORS: allows `https://dash.maddox-duke.com` and localhost dev origins
