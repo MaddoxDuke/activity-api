@@ -4,8 +4,10 @@ require('dotenv').config();
 
 const Fastify = require('fastify');
 const { Pool } = require('pg');
+const { buildDigest } = require('./lib/digest');
+const { dayKeyInTz, mondayOf, addDays, dayWindow } = require('./lib/derive');
 
-const { DATABASE_URL, API_KEY, PORT = 3000 } = process.env;
+const { DATABASE_URL, API_KEY, PORT = 3000, DIGEST_TZ = 'America/Chicago' } = process.env;
 
 if (!DATABASE_URL) {
   console.error('Missing required env var DATABASE_URL');
@@ -81,6 +83,32 @@ fastify.get('/events', async (req, reply) => {
 
   const { rows } = await pool.query('SELECT * FROM events ORDER BY ts');
   return rows;
+});
+
+// The evening dispatch: today's account, with a week-over-week reading and
+// advice on Sundays (or ?week=1). Interpretation stays read-side — the
+// ingest path remains generic.
+fastify.get('/digest', async (req, reply) => {
+  const tz = req.query.tz ?? DIGEST_TZ;
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+  } catch {
+    return reply.code(400).send({ error: 'unknown tz' });
+  }
+
+  const nowMs = Date.now();
+  const date = req.query.date ?? dayKeyInTz(nowMs, tz);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(dayWindow(date, tz).start)) {
+    return reply.code(400).send({ error: 'date must be YYYY-MM-DD' });
+  }
+
+  // Five weeks of history feeds the week-over-week and advice medians.
+  const cutoff = dayWindow(addDays(mondayOf(date, tz), -28), tz).start;
+  const { rows } = await pool.query('SELECT ts, event, source FROM events WHERE ts >= $1 ORDER BY ts', [
+    new Date(cutoff).toISOString(),
+  ]);
+
+  return buildDigest(rows, { date, tz, nowMs, forceWeekly: req.query.week === '1' });
 });
 
 fastify.addHook('onClose', async () => {

@@ -99,6 +99,11 @@ other producers (editing PC, car projects, manual entries) also feed.
    - Node 22 / Fastify / pg
    - `POST /events` — accepts `{ts, event, source}`, requires `x-api-key` header
    - `GET /events?from=<iso date>` — returns rows ordered by ts, requires key
+   - `GET /digest?date=&tz=&week=1` — the evening dispatch: server-side
+     session pairing (lib/derive.js mirrors the dash rules) rendered as a
+     phone-notification-ready day summary; Sundays (or `week=1`) add a
+     week-over-week reading plus ≤2 deterministic advice lines. Consumed by
+     an iOS Shortcuts personal automation each evening. Requires key.
    - `GET /health` — unauthenticated, for monitoring
    - Validation: `ts` must parse as a date; `event` must be snake_case text
    - CORS: allows `https://dash.maddox-duke.com` and localhost dev origins
@@ -162,7 +167,9 @@ other producers (editing PC, car projects, manual entries) also feed.
 1. Harden ingest: rate limiting, better error responses, request logging
 2. Duration-pairing endpoint(s): `GET /sessions?event_pair=arrived_gym,left_gym`
 3. ~~Dashboard v1 at dash.maddox-duke.com~~ — shipped July 2026 ("Whereabouts")
-4. Weekly automated summary (scheduled analysis producing a narrative digest)
+4. ~~Weekly automated summary~~ — shipped July 2026 as `GET /digest`: daily
+   dispatch to the phone via Shortcuts automation; weekly reading + advice on
+   Sundays. (A richer narrative version could still come later.)
 5. Additional producers: ~~editing-time events from desktop~~ — shipped July
    2026 (RoughCut beacon + "The Cutting Room" page); drive-session events next
 6. Longer-term integrations with other personal projects (e.g., car telemetry

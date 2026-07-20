@@ -193,6 +193,66 @@ async function main() {
   check('GET with dash origin + key -> 200 + ACAO',
     r.status === 200 && r.headers.get('access-control-allow-origin') === 'https://dash.maddox-duke.com', r.status);
 
+  // ——— /digest ————————————————————————————————————————————————
+  const { zonedTimeToUtc, dayKeyInTz, mondayOf, addDays } = require(
+    require.resolve('./lib/derive.js', { paths: [APP_DIR] }),
+  );
+  const TZ = 'America/Chicago';
+  const yesterday = dayKeyInTz(Date.now() - 24 * 3600_000, TZ);
+  const [yy, ym, yd] = yesterday.split('-').map(Number);
+  const atLocal = (h, mi) => new Date(zonedTimeToUtc(yy, ym, yd, h, mi, TZ)).toISOString();
+  const post = (ts, event, source = 'harness') =>
+    fetch(BASE + '/events', {
+      method: 'POST', headers: { ...KEY, ...JSON_CT },
+      body: JSON.stringify({ ts, event, source }),
+    });
+
+  // A full specimen day (yesterday, local tz): work, gym, an evening reel.
+  await post(atLocal(9, 0), 'arrived_work');
+  await post(atLocal(17, 0), 'left_work');
+  await post(atLocal(17, 25), 'arrived_gym');
+  await post(atLocal(18, 30), 'left_gym');
+  await post(atLocal(18, 45), 'arrived_home');
+  await post(atLocal(20, 30), 'editing_start', 'roughcut');
+  await post(atLocal(22, 0), 'editing_stop', 'roughcut');
+  // Prior week: a shop block, so the weekly delta has something to say.
+  const prevMonday = addDays(mondayOf(yesterday, TZ), -7);
+  const [py, pm, pd] = prevMonday.split('-').map(Number);
+  await post(new Date(zonedTimeToUtc(py, pm, pd, 10, 0, TZ)).toISOString(), 'arrived_shop');
+  await post(new Date(zonedTimeToUtc(py, pm, pd, 12, 0, TZ)).toISOString(), 'left_shop');
+
+  // 20. digest requires the key
+  r = await fetch(BASE + `/digest?date=${yesterday}`);
+  check('GET /digest no key -> 401', r.status === 401, r.status);
+
+  // 21. digest for yesterday: paired buckets with spans
+  r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}`, { headers: KEY });
+  body = await r.json();
+  check('GET /digest -> 200 with day lines',
+    r.status === 200 && Array.isArray(body.day) && body.date === yesterday, r.status + ' ' + JSON.stringify(body.day));
+  const dayStr = (body.day || []).join(' | ');
+  check('digest pairs work 8h00 (9:00–17:00)', dayStr.includes('work 8h00 (9:00–17:00)'), dayStr);
+  check('digest pairs gym 1h05', dayStr.includes('gym 1h05'), dayStr);
+  check('digest pairs bench 1h30 (20:30–22:00)', dayStr.includes('bench 1h30 (20:30–22:00)'), dayStr);
+  check('digest counts transit', dayStr.includes('in transit'), dayStr);
+  check('digest body is notification-ready text',
+    typeof body.body === 'string' && body.body.length > 20 && !body.week, body.body);
+
+  // 22. weekly reading on demand
+  r = await fetch(BASE + `/digest?date=${yesterday}&tz=${TZ}&week=1`, { headers: KEY });
+  body = await r.json();
+  const weekStr = body.week ? body.week.lines.join(' | ') : '(none)';
+  check('digest?week=1 -> week lines with work delta',
+    !!body.week && weekStr.includes('work 8h00'), weekStr);
+  check('digest week advice is a bounded list',
+    Array.isArray(body.week?.advice) && body.week.advice.length <= 2, JSON.stringify(body.week?.advice));
+
+  // 23. validation
+  r = await fetch(BASE + '/digest?tz=Not/AZone', { headers: KEY });
+  check('digest bad tz -> 400', r.status === 400, r.status);
+  r = await fetch(BASE + '/digest?date=16-07-2026', { headers: KEY });
+  check('digest bad date -> 400', r.status === 400, r.status);
+
   console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
 }
