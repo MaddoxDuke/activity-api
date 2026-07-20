@@ -123,8 +123,11 @@ other producers (editing PC, car projects, manual entries) also feed.
 
 3. **Dashboard — "Whereabouts"** (built — repo `activity-dash`, static Angular 22
    app at `dash.maddox-duke.com`, deployed by rsync to `/var/www/dash`)
-   Two routed pages sharing the key-gate and store: `/` (the almanac) and
-   `/cutting-room` (editing sessions — see component 4). Caddy's
+   Three routed pages sharing the key-gate and store: `/` (the almanac),
+   `/cutting-room` (editing sessions — see component 4), and `/box-office`
+   (channel analytics + daily scouted video ideas, fed by the separate
+   channel-api service — see its repo's CLAUDE.md; the page shows a calm
+   "dark house" state whenever that service is unreachable). Caddy's
    `try_files {path} /index.html` covers deep links.
    - Key-gated in the client: the operator key is entered once, verified
      against the API, and kept in localStorage. `?demo=1` renders seeded
