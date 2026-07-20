@@ -154,7 +154,7 @@ other producers (editing PC, car projects, manual entries) also feed.
      independent of place stays (activities overlap places). A repeated start
      closes the open session as a tightly-bounded *unknown* (crash = gap).
      Powers `/cutting-room`: live deck-counter timecode, film-reel session
-     shelf, shop-vs-bench weekly trade, hour-of-day frames, bench ledger.
+     shelf, shop-vs-editing weekly trade, hour-of-day frames, editing ledger.
    - Almanac back-matter (folios VII–IX): **The Analyst** (nightly counsel
      filed by the `almanac-analyst` scheduled Claude Code routine on the
      operator's Max subscription — local scheduled task, runs while the

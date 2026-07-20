@@ -265,13 +265,13 @@ async function main() {
   const dayStr = (body.day || []).join(' | ');
   check('digest tells work with start and end', dayStr.includes('work — 8h00 (9:00am–5:00pm)'), dayStr);
   check('digest tells gym with start and end', dayStr.includes('gym — 1h05 (5:25pm–6:30pm)'), dayStr);
-  check('digest tells the reel with start and end', dayStr.includes('bench — 1h30 (8:30pm–10:00pm)'), dayStr);
+  check('digest tells the reel with start and end', dayStr.includes('editing — 1h30 (8:30pm–10:00pm)'), dayStr);
   check('digest keeps chronological order',
-    dayStr.indexOf('work') < dayStr.indexOf('gym') && dayStr.indexOf('gym') < dayStr.indexOf('bench'), dayStr);
+    dayStr.indexOf('work') < dayStr.indexOf('gym') && dayStr.indexOf('gym') < dayStr.indexOf('editing'), dayStr);
   check('digest has no aggregation counters', !dayStr.includes('×'), dayStr);
   check('digest totals line covers buckets and transit',
     typeof body.totals === 'string' && body.totals.includes('work 8h00')
-      && body.totals.includes('gym 1h05') && body.totals.includes('bench 1h30')
+      && body.totals.includes('gym 1h05') && body.totals.includes('editing 1h30')
       && body.totals.includes('transit'), body.totals);
   check('digest reports gym streak', body.streak >= 1, String(body.streak));
   check('an honest day earns no note', body.note === null, String(body.note));
@@ -288,12 +288,13 @@ async function main() {
   body = await r.json();
   check('a lazy day earns a verdict note',
     typeof body.note === 'string' && body.note.length > 20, String(body.note));
-  // Weekly rides along exactly when the reported day is a Sunday.
-  const yesterdayIsSunday = new Intl.DateTimeFormat('en', {
+  // Weekly rides along exactly when the reported day is a Sunday — judge
+  // the day this body actually reports (the lazy day), not yesterday.
+  const lazyDayIsSunday = new Intl.DateTimeFormat('en', {
     timeZone: TZ, weekday: 'short',
-  }).format(new Date(zonedTimeToUtc(yy, ym, yd, 12, 0, TZ))) === 'Sun';
+  }).format(new Date(zonedTimeToUtc(lz, lm, ld, 12, 0, TZ))) === 'Sun';
   check('digest body is notification-ready text',
-    typeof body.body === 'string' && body.body.length > 20 && !!body.week === yesterdayIsSunday,
+    typeof body.body === 'string' && body.body.length > 20 && !!body.week === lazyDayIsSunday,
     body.body);
 
   // 21b. no date param -> reports the completed prior day
@@ -372,9 +373,9 @@ async function main() {
     method: 'POST', headers: { ...ANALYST, ...JSON_CT },
     body: JSON.stringify({
       day: yesterday,
-      briefing: 'A strong bench night followed the gym; guard the pre-9pm start.',
-      observations: ['gym at 17:25 for 1h05', 'bench lit at 20:30 for 1h30'],
-      suggestions: ['repeat the gym-then-bench pairing on Wednesday'],
+      briefing: 'A strong editing night followed the gym; guard the pre-9pm start.',
+      observations: ['gym at 17:25 for 1h05', 'editing started at 20:30 for 1h30'],
+      suggestions: ['repeat the gym-then-editing pairing on Wednesday'],
     }),
   });
   body = await r.json();
@@ -396,7 +397,7 @@ async function main() {
   check('digest vitals line orders weight before calories',
     body.vitals === 'vitals: weight 182.6 lb · 2,200 kcal', body.vitals);
   check('digest body carries the analyst briefing',
-    body.body.includes('the analyst: A strong bench night'), body.body);
+    body.body.includes('the analyst: A strong editing night'), body.body);
 
   console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
   process.exit(failures === 0 ? 0 : 1);
